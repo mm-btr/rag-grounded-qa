@@ -1,0 +1,58 @@
+# Qdrant is pinned to the patch — storage-format sensitive.
+services:
+  qdrant:
+    image: qdrant/qdrant:v1.18.2
+    container_name: qdrant
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6333:6333"
+      - "127.0.0.1:6334:6334"
+    volumes:
+      - qdrant_storage:/qdrant/storage
+
+  postgres:
+    image: postgres:17
+    container_name: rag-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-ragdb}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - rag_pg:/var/lib/postgresql/data
+      - ./app/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+
+  bot:
+    build:
+      context: ./app
+    image: rag-app
+    container_name: rag-bot
+    restart: unless-stopped
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    env_file: .env
+    environment:
+      QDRANT_URL: http://qdrant:6333
+      POSTGRES_HOST: postgres
+      PYTHONDONTWRITEBYTECODE: "1"
+    volumes:
+      - rag_models:/models
+      - ./app:/app:ro
+    tmpfs:
+      - /tmp:size=512m,mode=1777
+    working_dir: /app
+    command: ["python", "bot.py"]
+    depends_on:
+      - qdrant
+      - postgres
+
+volumes:
+  qdrant_storage:
+  rag_pg:
+  rag_models:
+    name: rag_models

@@ -1,0 +1,8 @@
+.env
+__pycache__/
+*.py[cod]
+.pytest_cache/
+eval/corpus/
+SERVER.md
+CHANGELOG.md
+BACKLOG.md

@@ -1,0 +1,39 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  unit:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: app/requirements.txt
+      - name: Install deps
+        # Unit tests do not need ML; import-only runtime pins come from Dockerfile.
+        run: |
+          grep -vE 'torch|transformers|FlagEmbedding|docling' app/requirements.txt > ci-requirements.txt
+          grep -hoE '\S+==\S+' app/Dockerfile >> ci-requirements.txt
+          pip install -r ci-requirements.txt
+      - name: Unit tests (app)
+        run: |
+          cd app
+          for t in tests/test_*.py; do
+            case "$t" in
+              # Integration tests need live Qdrant and models.
+              *test_ingest_cite.py|*test_isolation.py) continue;;
+            esac
+            echo "== $t"
+            PYTHONPATH=. python "$t"
+          done
+      - name: Unit tests (eval)
+        run: |
+          python eval/tests/test_scoring.py
+          python eval/tests/test_golden.py
+          python eval/tests/test_export_run.py
